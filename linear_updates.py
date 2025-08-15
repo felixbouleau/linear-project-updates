@@ -4,9 +4,15 @@ import os
 import sys
 import argparse
 from datetime import datetime
-from typing import Dict, List, Any
+from typing import Dict, List, Any, Tuple, Optional
 from pathlib import Path
 import requests
+
+
+def error_exit(message: str) -> None:
+    """Print error message and exit with status 1."""
+    print(f"Error: {message}", file=sys.stderr)
+    sys.exit(1)
 
 
 def get_linear_api_key() -> str:
@@ -30,16 +36,15 @@ def get_linear_api_key() -> str:
             print(f"Error reading config file {config_file}: {e}")
     
     # No API key found
-    print("Error: LINEAR_API_KEY not found.")
-    print("Please either:")
-    print("1. Set the environment variable: export LINEAR_API_KEY='your_api_key_here'")
-    print(f"2. Create a config file at {config_file} containing your API key")
-    print(f"   mkdir -p {config_dir}")
-    print(f"   echo 'your_api_key_here' > {config_file}")
-    sys.exit(1)
+    error_exit(f"""LINEAR_API_KEY not found.
+Please either:
+1. Set the environment variable: export LINEAR_API_KEY='your_api_key_here'
+2. Create a config file at {config_file} containing your API key
+   mkdir -p {config_dir}
+   echo 'your_api_key_here' > {config_file}""")
 
 
-def build_graphql_query() -> str:
+def build_graphql_query() -> Tuple[str, Dict[str, Any]]:
     """Build the GraphQL query to fetch all project updates."""
     query = """
     query GetProjectUpdates {
@@ -90,31 +95,24 @@ def fetch_project_updates(api_key: str) -> List[Dict[str, Any]]:
     }
     
     try:
-        response = requests.post(url, json=payload, headers=headers)
+        response = requests.post(url, json=payload, headers=headers, timeout=30)
         
         # Print response details for debugging
         if response.status_code != 200:
-            print(f"HTTP Error {response.status_code}")
-            print(f"Response: {response.text}")
-            sys.exit(1)
+            error_exit(f"HTTP Error {response.status_code}: {response.text}")
         
         data = response.json()
         
         if "errors" in data:
-            print("GraphQL Errors:")
-            for error in data["errors"]:
-                print(f"  - {error['message']}")
-            sys.exit(1)
+            error_messages = "\n".join(f"  - {error['message']}" for error in data["errors"])
+            error_exit(f"GraphQL Errors:\n{error_messages}")
         
         return data["data"]["projectUpdates"]["nodes"]
     
     except requests.exceptions.RequestException as e:
-        print(f"Error making request to Linear API: {e}")
-        sys.exit(1)
+        error_exit(f"Error making request to Linear API: {e}")
     except KeyError as e:
-        print(f"Unexpected response format: {e}")
-        print(f"Response: {response.text}")
-        sys.exit(1)
+        error_exit(f"Unexpected response format: {e}\nResponse: {response.text}")
 
 
 def format_date(iso_date: str) -> str:
@@ -200,7 +198,7 @@ def get_latest_update_per_project(updates: List[Dict[str, Any]]) -> List[Dict[st
     return latest_updates
 
 
-def print_project_updates(updates: List[Dict[str, Any]], include_updated: bool = False, bold_headers: bool = False) -> None:
+def print_project_updates(updates: List[Dict[str, Any]], *, include_updated: bool = False, bold_headers: bool = False) -> None:
     """Print project updates to console in a simplified format."""
     if not updates:
         return
@@ -236,7 +234,7 @@ def print_project_updates(updates: List[Dict[str, Any]], include_updated: bool =
         print()
 
 
-def main():
+def main() -> None:
     """Main function to orchestrate the project updates fetching."""
     # Parse command line arguments
     parser = argparse.ArgumentParser(description='Fetch Linear project updates')
