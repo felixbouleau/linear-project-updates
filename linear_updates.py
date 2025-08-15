@@ -1,24 +1,9 @@
 #!/usr/bin/env python3
-"""
-Linear Project Updates Fetcher
-
-This script fetches all project updates from Linear using their GraphQL API
-and shows the latest update for each project, ordered by priority.
-
-Setup:
-    1. Set environment variable: export LINEAR_API_KEY='your_api_key'
-    2. Or create config file: ~/.config/linear-project-updates/config
-
-Usage:
-    linear-updates                    # Show all projects by priority
-    linear-updates -p                 # Show only in-progress/paused projects
-    linear-updates --help             # Show help
-"""
 
 import os
 import sys
 import argparse
-from datetime import datetime, timedelta
+from datetime import datetime
 from typing import Dict, List, Any
 from pathlib import Path
 import requests
@@ -167,7 +152,6 @@ def is_project_in_progress_or_paused(update: Dict[str, Any]) -> bool:
     status = project.get("status", {})
     state = project.get("state", "").lower()
     status_name = status.get("name", "").lower()
-    status_type = status.get("type", "").lower()
     
     # Include projects that are actively being worked on or paused
     # Based on actual Linear status data:
