@@ -1,9 +1,11 @@
 #!/usr/bin/env python3
 
+__version__ = "0.2.0"
+
 import os
 import sys
 import argparse
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Dict, List, Any, Tuple, Optional
 from pathlib import Path
 import requests
@@ -124,6 +126,21 @@ def format_date(iso_date: str) -> str:
         return iso_date
 
 
+def is_update_recent(update: Dict[str, Any], days: int = 14) -> bool:
+    """Check if update was created/modified within the last N days."""
+    try:
+        # Use updatedAt if available, otherwise fall back to createdAt
+        date_str = update.get("updatedAt", update.get("createdAt", ""))
+        if not date_str:
+            return False
+        
+        update_date = datetime.fromisoformat(date_str.replace('Z', '+00:00'))
+        cutoff_date = datetime.now().replace(tzinfo=update_date.tzinfo) - timedelta(days=days)
+        return update_date >= cutoff_date
+    except (ValueError, TypeError):
+        return False
+
+
 def get_project_priority_score(update: Dict[str, Any]) -> int:
     """Get project priority score from Linear API priority field.
     Linear priority values: 1 (Urgent), 2 (High), 3 (Medium), 4 (Low), 0 (No priority)
@@ -238,12 +255,15 @@ def main() -> None:
     """Main function to orchestrate the project updates fetching."""
     # Parse command line arguments
     parser = argparse.ArgumentParser(description='Fetch Linear project updates')
+    parser.add_argument('--version', '-v', action='version', version=f'linear-updates {__version__}')
     parser.add_argument('--in-progress-only', '-p', action='store_true', 
                        help='Only show updates from projects that are in progress or paused')
     parser.add_argument('--include-updated', '-u', action='store_true',
                        help='Include last updated timestamp in project headers')
     parser.add_argument('--bold-headers', '-b', action='store_true',
                        help='Use bold markdown headers instead of ## headers')
+    parser.add_argument('--recent', '-r', action='store_true',
+                       help='Only show updates from the last two weeks')
     args = parser.parse_args()
     
     # Get API key
@@ -259,6 +279,11 @@ def main() -> None:
     if args.in_progress_only:
         latest_updates = [update for update in latest_updates 
                          if is_project_in_progress_or_paused(update)]
+    
+    # Filter for recent updates if requested
+    if args.recent:
+        latest_updates = [update for update in latest_updates 
+                         if is_update_recent(update)]
     
     # Print results
     print_project_updates(latest_updates, include_updated=args.include_updated, bold_headers=args.bold_headers)

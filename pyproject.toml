@@ -1,6 +1,6 @@
 [project]
 name = "linear-project-updates"
-version = "0.1.0"
+version = "0.2.0"
 description = "Fetch Linear project updates via GraphQL API"
 readme = "README.md"
 license = "MIT"
