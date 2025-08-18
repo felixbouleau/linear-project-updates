@@ -7,6 +7,7 @@ import sys
 import argparse
 from datetime import datetime, timedelta
 from typing import Dict, List, Any, Tuple, Optional
+import time
 from pathlib import Path
 import requests
 
@@ -96,25 +97,39 @@ def fetch_project_updates(api_key: str) -> List[Dict[str, Any]]:
         "variables": variables
     }
     
-    try:
-        response = requests.post(url, json=payload, headers=headers, timeout=30)
+    max_retries = 3
+    for attempt in range(max_retries):
+        try:
+            response = requests.post(url, json=payload, headers=headers, timeout=(10, 30))
+            
+            # Print response details for debugging
+            if response.status_code != 200:
+                error_exit(f"HTTP Error {response.status_code}: {response.text}")
+            
+            data = response.json()
+            
+            if "errors" in data:
+                error_messages = "\n".join(f"  - {error['message']}" for error in data["errors"])
+                error_exit(f"GraphQL Errors:\n{error_messages}")
+            
+            return data["data"]["projectUpdates"]["nodes"]
         
-        # Print response details for debugging
-        if response.status_code != 200:
-            error_exit(f"HTTP Error {response.status_code}: {response.text}")
-        
-        data = response.json()
-        
-        if "errors" in data:
-            error_messages = "\n".join(f"  - {error['message']}" for error in data["errors"])
-            error_exit(f"GraphQL Errors:\n{error_messages}")
-        
-        return data["data"]["projectUpdates"]["nodes"]
-    
-    except requests.exceptions.RequestException as e:
-        error_exit(f"Error making request to Linear API: {e}")
-    except KeyError as e:
-        error_exit(f"Unexpected response format: {e}\nResponse: {response.text}")
+        except requests.exceptions.ConnectionError as e:
+            if attempt < max_retries - 1:
+                print(f"Connection failed (attempt {attempt + 1}/{max_retries}), retrying in {attempt + 1} seconds...", file=sys.stderr)
+                time.sleep(attempt + 1)
+                continue
+            error_exit(f"Failed to connect to Linear API after {max_retries} attempts: {e}")
+        except requests.exceptions.Timeout as e:
+            if attempt < max_retries - 1:
+                print(f"Request timed out (attempt {attempt + 1}/{max_retries}), retrying in {attempt + 1} seconds...", file=sys.stderr)
+                time.sleep(attempt + 1)
+                continue
+            error_exit(f"Request to Linear API timed out after {max_retries} attempts: {e}")
+        except requests.exceptions.RequestException as e:
+            error_exit(f"Error making request to Linear API: {e}")
+        except KeyError as e:
+            error_exit(f"Unexpected response format: {e}\nResponse: {response.text}")
 
 
 def format_date(iso_date: str) -> str:
