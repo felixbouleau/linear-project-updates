@@ -34,7 +34,8 @@ linear-updates                    # All projects by priority
 linear-updates -p                 # In-progress/paused projects only
 linear-updates -u                 # Include timestamps
 linear-updates -b                 # Bold headers instead of ##
-linear-updates -p -u -b           # Combined flags
+linear-updates -r                 # Recent updates only (last 2 weeks)
+linear-updates -p -u -b -r        # Combined flags
 ```
 
 ### Command Options
@@ -42,6 +43,7 @@ linear-updates -p -u -b           # Combined flags
 - `-p, --in-progress-only`: Filter to active/paused projects (excludes backlog)
 - `-u, --include-updated`: Add timestamps to project headers
 - `-b, --bold-headers`: Use **bold** instead of ## markdown headers
+- `-r, --recent`: Only show updates from the last two weeks
 
 
 ## Project Filtering
