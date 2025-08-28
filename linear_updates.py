@@ -141,8 +141,8 @@ def format_date(iso_date: str) -> str:
         return iso_date
 
 
-def is_update_recent(update: Dict[str, Any], days: int = 14) -> bool:
-    """Check if update was created/modified within the last N days."""
+def is_update_recent(update: Dict[str, Any], weeks: int = 2) -> bool:
+    """Check if update was created/modified within the last N weeks."""
     try:
         # Use updatedAt if available, otherwise fall back to createdAt
         date_str = update.get("updatedAt", update.get("createdAt", ""))
@@ -150,7 +150,7 @@ def is_update_recent(update: Dict[str, Any], days: int = 14) -> bool:
             return False
         
         update_date = datetime.fromisoformat(date_str.replace('Z', '+00:00'))
-        cutoff_date = datetime.now().replace(tzinfo=update_date.tzinfo) - timedelta(days=days)
+        cutoff_date = datetime.now().replace(tzinfo=update_date.tzinfo) - timedelta(weeks=weeks)
         return update_date >= cutoff_date
     except (ValueError, TypeError):
         return False
@@ -277,8 +277,8 @@ def main() -> None:
                        help='Include last updated timestamp in project headers')
     parser.add_argument('--bold-headers', '-b', action='store_true',
                        help='Use bold markdown headers instead of ## headers')
-    parser.add_argument('--recent', '-r', action='store_true',
-                       help='Only show updates from the last two weeks')
+    parser.add_argument('--weeks-back', '-w', type=int, metavar='N',
+                       help='Only show updates from the last N weeks')
     args = parser.parse_args()
     
     # Get API key
@@ -296,9 +296,9 @@ def main() -> None:
                          if is_project_in_progress_or_paused(update)]
     
     # Filter for recent updates if requested
-    if args.recent:
+    if args.weeks_back:
         latest_updates = [update for update in latest_updates 
-                         if is_update_recent(update)]
+                         if is_update_recent(update, args.weeks_back)]
     
     # Print results
     print_project_updates(latest_updates, include_updated=args.include_updated, bold_headers=args.bold_headers)
