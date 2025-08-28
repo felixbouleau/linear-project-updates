@@ -68,6 +68,7 @@ def build_graphql_query() -> Tuple[str, Dict[str, Any]]:
             description
             state
             priority
+            url
             status {
               id
               name
@@ -236,9 +237,16 @@ def print_project_updates(updates: List[Dict[str, Any]], *, include_updated: boo
         return
     
     for update in updates:
-        # Project name
+        # Project name and URL
         project = update.get("project", {})
         project_name = project.get('name', 'Unknown')
+        project_url = project.get('url', '')
+        
+        # Create linked project name
+        if project_url:
+            linked_name = f"[{project_name}]({project_url})"
+        else:
+            linked_name = project_name
         
         # Create header with or without timestamp
         if include_updated:
@@ -246,14 +254,14 @@ def print_project_updates(updates: List[Dict[str, Any]], *, include_updated: boo
             updated_at = update.get("updatedAt", update.get("createdAt", ""))
             formatted_date = format_date(updated_at)
             if bold_headers:
-                header = f"**{project_name} ({formatted_date})**"
+                header = f"**{linked_name} ({formatted_date})**"
             else:
-                header = f"## {project_name} ({formatted_date})"
+                header = f"## {linked_name} ({formatted_date})"
         else:
             if bold_headers:
-                header = f"**{project_name}**"
+                header = f"**{linked_name}**"
             else:
-                header = f"## {project_name}"
+                header = f"## {linked_name}"
         
         # Update content
         body = update.get("body", "").strip()
