@@ -1,0 +1,1 @@
+- Always use `uv tool install --reinstall .` to reinstall the tool after making changes to it
