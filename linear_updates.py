@@ -267,6 +267,7 @@ def print_project_updates(updates: List[Dict[str, Any]], *, include_updated: boo
         body = update.get("body", "").strip()
         
         print(header)
+        print()
         if body:
             print(f"{body}")
         else:
