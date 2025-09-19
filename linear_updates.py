@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-__version__ = "0.2.0"
+__version__ = "0.3.0"
 
 import os
 import sys
@@ -149,9 +149,24 @@ def is_update_recent(update: Dict[str, Any], weeks: int = 2) -> bool:
         date_str = update.get("updatedAt", update.get("createdAt", ""))
         if not date_str:
             return False
-        
+
         update_date = datetime.fromisoformat(date_str.replace('Z', '+00:00'))
         cutoff_date = datetime.now().replace(tzinfo=update_date.tzinfo) - timedelta(weeks=weeks)
+        return update_date >= cutoff_date
+    except (ValueError, TypeError):
+        return False
+
+
+def is_update_recent_days(update: Dict[str, Any], days: int) -> bool:
+    """Check if update was created/modified within the last N days."""
+    try:
+        # Use updatedAt if available, otherwise fall back to createdAt
+        date_str = update.get("updatedAt", update.get("createdAt", ""))
+        if not date_str:
+            return False
+
+        update_date = datetime.fromisoformat(date_str.replace('Z', '+00:00'))
+        cutoff_date = datetime.now().replace(tzinfo=update_date.tzinfo) - timedelta(days=days)
         return update_date >= cutoff_date
     except (ValueError, TypeError):
         return False
@@ -231,23 +246,23 @@ def get_latest_update_per_project(updates: List[Dict[str, Any]]) -> List[Dict[st
     return latest_updates
 
 
-def print_project_updates(updates: List[Dict[str, Any]], *, include_updated: bool = False, bold_headers: bool = False) -> None:
+def print_project_updates(updates: List[Dict[str, Any]], *, include_updated: bool = False, bold_headers: bool = False, stale_mode: bool = False) -> None:
     """Print project updates to console in a simplified format."""
     if not updates:
         return
-    
+
     for update in updates:
         # Project name and URL
         project = update.get("project", {})
         project_name = project.get('name', 'Unknown')
         project_url = project.get('url', '')
-        
+
         # Create linked project name
         if project_url:
             linked_name = f"[{project_name}]({project_url})"
         else:
             linked_name = project_name
-        
+
         # Create header with or without timestamp
         if include_updated:
             # Update date (prefer updatedAt over createdAt)
@@ -262,11 +277,17 @@ def print_project_updates(updates: List[Dict[str, Any]], *, include_updated: boo
                 header = f"**{linked_name}**"
             else:
                 header = f"## {linked_name}"
-        
-        # Update content
-        body = update.get("body", "").strip()
-        
+
         print(header)
+
+        # In stale mode, only show the title/link, no content
+        if stale_mode:
+            print()
+            continue
+
+        # Update content (only shown when not in stale mode)
+        body = update.get("body", "").strip()
+
         print()
         if body:
             print(f"{body}")
@@ -288,6 +309,8 @@ def main() -> None:
                        help='Use bold markdown headers instead of ## headers')
     parser.add_argument('--weeks-back', '-w', type=int, metavar='N',
                        help='Only show updates from the last N weeks')
+    parser.add_argument('--stale', '-s', type=int, metavar='N',
+                       help='Show projects that have NOT been updated in the last N days')
     args = parser.parse_args()
     
     # Get API key
@@ -306,11 +329,18 @@ def main() -> None:
     
     # Filter for recent updates if requested
     if args.weeks_back:
-        latest_updates = [update for update in latest_updates 
+        latest_updates = [update for update in latest_updates
                          if is_update_recent(update, args.weeks_back)]
-    
+
+    # Filter for stale projects if requested
+    if args.stale:
+        latest_updates = [update for update in latest_updates
+                         if not is_update_recent_days(update, args.stale)]
+        # Sort stale projects by how old they are (oldest first)
+        latest_updates.sort(key=lambda x: x.get("updatedAt", x.get("createdAt", "")))
+
     # Print results
-    print_project_updates(latest_updates, include_updated=args.include_updated, bold_headers=args.bold_headers)
+    print_project_updates(latest_updates, include_updated=args.include_updated, bold_headers=args.bold_headers, stale_mode=bool(args.stale))
 
 
 if __name__ == "__main__":
